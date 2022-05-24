@@ -90,8 +90,9 @@ defmodule Ueberauth.Strategy.Okta.OAuth do
     |> put_headers(headers)
   end
 
-  defp userinfo_url() do
-    Application.get_env(:ueberauth, __MODULE__)
+  defp userinfo_url do
+    :ueberauth
+    |> Application.get_env(__MODULE__)
     |> Keyword.get(:userinfo_url, Keyword.get(@defaults, :userinfo_url))
   end
 

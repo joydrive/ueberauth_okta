@@ -32,8 +32,9 @@ defmodule Ueberauth.Okta.Mixfile do
       {:jason, "~> 1.2"},
       {:oauth2, "~> 2.0"},
       {:ueberauth, "~> 0.7"},
-      {:credo, "~> 1.5", only: [:dev, :test]},
-      {:ex_doc, ">= 0.0.0", only: :docs, runtime: false}
+      {:credo, "~> 1.6", only: [:dev, :test]},
+      {:ex_doc, ">= 0.0.0", only: :docs, runtime: false},
+      {:mox, "~> 1.0", only: [:test]}
     ]
   end
 

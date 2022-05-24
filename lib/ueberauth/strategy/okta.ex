@@ -81,15 +81,16 @@ defmodule Ueberauth.Strategy.Okta do
 
   _Note that not all parameters are compatible with this flow_.
   """
-  use Ueberauth.Strategy, uid_field: :sub,
-                          oauth2_module: Ueberauth.Strategy.Okta.OAuth,
-                          oauth2_params: [scope: "openid email profile"]
-
-  alias Ueberauth.Auth.Info
-  alias Ueberauth.Auth.Credentials
-  alias Ueberauth.Auth.Extra
+  use Ueberauth.Strategy,
+    uid_field: :sub,
+    oauth2_module: Ueberauth.Strategy.Okta.OAuth,
+    oauth2_params: [scope: "openid email profile"]
 
   alias Plug.Conn
+  alias Ueberauth.Auth.Credentials
+  alias Ueberauth.Auth.Extra
+  alias Ueberauth.Auth.Info
+  alias Ueberauth.Strategy.Okta.OAuth
 
   @doc """
   Includes the credentials from the Okta response.
@@ -111,7 +112,7 @@ defmodule Ueberauth.Strategy.Okta do
   Stores the raw information (including the token) obtained from the Okta callback.
   """
   def extra(conn) do
-    %Extra {
+    %Extra{
       raw_info: %{
         token: conn.private.okta_token,
         user: conn.private.okta_user
@@ -128,12 +129,13 @@ defmodule Ueberauth.Strategy.Okta do
   def handle_request!(conn) do
     redirect_uri = conn.params["redirect_uri"] || callback_url(conn)
 
-    params = conn
-             |> option(:oauth2_params)
-             |> with_state_param(conn)
+    params =
+      conn
+      |> option(:oauth2_params)
+      |> with_state_param(conn)
 
     module = option(conn, :oauth2_module)
-    url = apply(module, :authorize_url!, [params, [redirect_uri: redirect_uri]])
+    url = module.authorize_url!(params, redirect_uri: redirect_uri)
     redirect!(conn, url)
   end
 
@@ -146,11 +148,13 @@ defmodule Ueberauth.Strategy.Okta do
   def handle_callback!(%Conn{params: %{"code" => code}} = conn) do
     module = option(conn, :oauth2_module)
 
-    case apply(module, :get_token, [[code: code], [redirect_uri: callback_url(conn)]]) do
+    case module.get_token(code: code, redirect_uri: callback_url(conn)) do
       {:ok, %{token: token}} ->
         fetch_user(conn, token)
+
       {:error, %{body: %{"error" => key, "error_description" => message}, status_code: status}} ->
         set_errors!(conn, error("#{key} [#{status}]", message))
+
       err ->
         set_errors!(conn, error("Unknown Error fetching token", inspect(err)))
     end
@@ -205,15 +209,16 @@ defmodule Ueberauth.Strategy.Okta do
   defp fetch_user(conn, token) do
     conn = put_private(conn, :okta_token, token)
 
-    with {:ok, %OAuth2.Response{status_code: status, body: body}} <- Ueberauth.Strategy.Okta.OAuth.get_user_info(token),
-         {200, user} <- {status, body}
-    do
+    with {:ok, %OAuth2.Response{status_code: status, body: body}} <- OAuth.get_user_info(token),
+         {200, user} <- {status, body} do
       put_private(conn, :okta_user, user)
     else
       {:error, %OAuth2.Error{reason: reason}} ->
         set_errors!(conn, error("OAuth2", inspect(reason)))
+
       {401, _} ->
         set_errors!(conn, error("Okta token [401]", "unauthorized"))
+
       {status, body} when status in 400..599 ->
         set_errors!(conn, error("Okta [#{status}]", inspect(body)))
     end
